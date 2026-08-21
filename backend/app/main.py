@@ -3,10 +3,17 @@ from fastapi import FastAPI, Depends
 from dotenv import load_dotenv
 from supabase import create_client, Client
 from app.core.security import get_current_user, get_user_id
+from app.api.v1.auth import router as auth_router
+from app.api.v1.crops import router as crops_router
+from app.api.v1.crops import router as crops_router
 
 load_dotenv()
 
 app = FastAPI(title="Kisan Dost AI API")
+
+app.include_router(auth_router)
+app.include_router(crops_router)
+
 
 supabase_url = os.environ.get("SUPABASE_URL")
 supabase_key = os.environ.get("SUPABASE_ANON_KEY")
@@ -34,8 +41,4 @@ def health_supabase():
 
 @app.get("/api/v1/auth/me")
 def get_me(user: dict = Depends(get_current_user)):
-    """
-    Protected test endpoint. Requires a valid Supabase JWT in the
-    Authorization header. Returns the authenticated user's ID.
-    """
     return {"user_id": get_user_id(user), "email": user.get("email")}
