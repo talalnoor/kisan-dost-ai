@@ -2,6 +2,12 @@
 
 Supabase Postgres, region `ap-south-1` (Mumbai). All tables have Row Level Security enabled — a user can only ever read/write their own data, enforced at the database level.
 
+**Important — GRANT permissions:** RLS policies alone are not enough. After creating any new table, also run a table-level GRANT, e.g.:
+```sql
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.<table_name> TO authenticated;
+```
+(adjust the verb list to match what the table's RLS policies actually allow). Without this, every query fails with `permission denied for table ...` even though RLS is configured correctly — this bit us once during `crops` testing.
+
 ## `profiles`
 Extends `auth.users` with app-specific fields. 1:1 with the auth user.
 
