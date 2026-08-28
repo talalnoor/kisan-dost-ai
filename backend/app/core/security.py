@@ -1,16 +1,22 @@
 import os
 import jwt
+from jwt import PyJWKClient, PyJWTError
 from fastapi import Header, HTTPException
-from jwt import PyJWTError
+from dotenv import load_dotenv
 
-SUPABASE_JWT_SECRET = os.environ.get("SUPABASE_JWT_SECRET")
+load_dotenv()
+
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+JWKS_URL = f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json"
+
+_jwks_client = PyJWKClient(JWKS_URL)
 
 
 def get_current_user(authorization: str = Header(None)) -> dict:
     """
-    Verifies the Supabase JWT sent in the Authorization header.
+    Verifies the Supabase JWT sent in the Authorization header,
+    using Supabase's public JWKS (supports ES256-signed tokens).
     Use as a FastAPI dependency: user = Depends(get_current_user)
-    Returns the decoded token payload, including 'sub' (the user's UUID).
     """
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
@@ -18,10 +24,11 @@ def get_current_user(authorization: str = Header(None)) -> dict:
     token = authorization.replace("Bearer ", "")
 
     try:
+        signing_key = _jwks_client.get_signing_key_from_jwt(token)
         payload = jwt.decode(
             token,
-            SUPABASE_JWT_SECRET,
-            algorithms=["HS256"],
+            signing_key.key,
+            algorithms=["ES256", "RS256"],
             audience="authenticated",
         )
         return payload
