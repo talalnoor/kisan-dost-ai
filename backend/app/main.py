@@ -5,13 +5,14 @@ from supabase import create_client, Client
 from app.core.security import get_current_user, get_user_id
 from app.api.v1.auth import router as auth_router
 from app.api.v1.crops import router as crops_router
-
+from app.api.v1.disease import router as disease_router
 load_dotenv()
 
 app = FastAPI(title="Kisan Dost AI API")
 
 app.include_router(auth_router)
 app.include_router(crops_router)
+app.include_router(disease_router)
 
 supabase_url = os.environ.get("SUPABASE_URL")
 supabase_key = os.environ.get("SUPABASE_ANON_KEY")
