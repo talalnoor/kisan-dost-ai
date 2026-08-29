@@ -1,7 +1,7 @@
 import os
 import uuid
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Header
 from supabase import create_client, Client
 from app.core.security import get_current_user, get_user_id
 
@@ -50,7 +50,7 @@ async def analyze_disease(
     crop_id: str = Form(...),
     scan_type: str = Form("disease"),
     user: dict = Depends(get_current_user),
-    authorization: str = None,
+    authorization: str = Header(None),
 ):
     user_id = get_user_id(user)
 
@@ -75,8 +75,11 @@ async def analyze_disease(
         "prevention": [],
     })
 
+    scan_id = str(uuid.uuid4())
+    created_at = datetime.now(timezone.utc).isoformat()
+
     result = {
-        "scan_id": str(uuid.uuid4()),
+        "scan_id": scan_id,
         "scan_type": scan_type,
         "disease": knowledge["display_name"],
         "confidence": confidence,
@@ -87,7 +90,33 @@ async def analyze_disease(
         "treatment": knowledge["treatment"],
         "prevention": knowledge["prevention"],
         "weather_risk": None,  # wired up once weather_service exists
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": created_at,
     }
+
+    # Persist the scan so it shows up in /history
+    token = authorization.replace("Bearer ", "") if authorization else None
+    client = get_user_supabase_client(token)
+    try:
+        client.table("disease_scans").insert({
+            "id": scan_id,
+            "user_id": user_id,
+            "crop_id": crop_id,
+            "scan_type": scan_type,
+            "disease_label": disease_label,
+            "disease_display_name": knowledge["display_name"],
+            "confidence": confidence,
+            "severity": knowledge["severity"],
+            "low_confidence": low_confidence,
+            "symptoms": knowledge["symptoms"],
+            "causes": knowledge["causes"],
+            "treatment": knowledge["treatment"],
+            "prevention": knowledge["prevention"],
+            "weather_snapshot": None,
+            "created_at": created_at,
+        }).execute()
+    except Exception as e:
+        # Don't fail the whole request if saving history fails —
+        # the farmer still gets their result even if history write breaks.
+        pass
 
     return {"success": True, "data": result, "error": None}
