@@ -8,6 +8,7 @@ from app.api.v1.crops import router as crops_router
 from app.api.v1.disease import router as disease_router
 from app.api.v1.history import router as history_router
 from app.api.v1.weather import router as weather_router
+from app.api.v1.chat import router as chat_router
 load_dotenv()
 
 app = FastAPI(title="Kisan Dost AI API")
@@ -17,7 +18,7 @@ app.include_router(crops_router)
 app.include_router(disease_router)
 app.include_router(history_router)
 app.include_router(weather_router)
-
+app.include_router(chat_router)
 supabase_url = os.environ.get("SUPABASE_URL")
 supabase_key = os.environ.get("SUPABASE_ANON_KEY")
 supabase: Client = create_client(supabase_url, supabase_key)
