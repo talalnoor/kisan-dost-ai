@@ -1,5 +1,6 @@
 import os
 import uuid
+import httpx
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Header
 from supabase import create_client, Client
@@ -9,9 +10,37 @@ router = APIRouter(prefix="/api/v1/disease", tags=["disease"])
 
 supabase_url = os.environ.get("SUPABASE_URL")
 supabase_anon_key = os.environ.get("SUPABASE_ANON_KEY")
+weather_api_key = os.environ.get("WEATHER_API_KEY")
 
 MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB
 ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/jpg"}
+
+
+def get_weather_risk(lat: float, lon: float, humidity_threshold: int = 75) -> dict:
+    """
+    Fetches current weather and converts it to a simple risk classification
+    for fungal/disease spread. Returns None if weather can't be fetched —
+    disease analysis must still succeed even if weather fails.
+    """
+    if not weather_api_key or lat is None or lon is None:
+        return None
+    try:
+        params = {"lat": lat, "lon": lon, "appid": weather_api_key, "units": "metric"}
+        response = httpx.get("https://api.openweathermap.org/data/2.5/weather", params=params, timeout=5)
+        response.raise_for_status()
+        data = response.json()
+        humidity = data["main"]["humidity"]
+        condition = data["weather"][0]["main"].lower()
+        is_rainy = "rain" in condition or "drizzle" in condition
+
+        if humidity >= humidity_threshold and is_rainy:
+            return {"level": "high", "reason": f"High humidity ({humidity}%) and rain increase fungal disease risk"}
+        elif humidity >= humidity_threshold:
+            return {"level": "medium", "reason": f"High humidity ({humidity}%) may increase disease risk"}
+        else:
+            return {"level": "low", "reason": "Current weather conditions are not favorable for rapid disease spread"}
+    except Exception:
+        return None
 
 
 def get_user_supabase_client(token: str) -> Client:
@@ -49,6 +78,8 @@ async def analyze_disease(
     image: UploadFile = File(...),
     crop_id: str = Form(...),
     scan_type: str = Form("disease"),
+    lat: float = Form(None),
+    lon: float = Form(None),
     user: dict = Depends(get_current_user),
     authorization: str = Header(None),
 ):
@@ -77,6 +108,7 @@ async def analyze_disease(
 
     scan_id = str(uuid.uuid4())
     created_at = datetime.now(timezone.utc).isoformat()
+    weather_risk = get_weather_risk(lat, lon)
 
     result = {
         "scan_id": scan_id,
@@ -89,7 +121,7 @@ async def analyze_disease(
         "causes": knowledge["causes"],
         "treatment": knowledge["treatment"],
         "prevention": knowledge["prevention"],
-        "weather_risk": None,  # wired up once weather_service exists
+        "weather_risk": weather_risk,
         "created_at": created_at,
     }
 
@@ -111,7 +143,7 @@ async def analyze_disease(
             "causes": knowledge["causes"],
             "treatment": knowledge["treatment"],
             "prevention": knowledge["prevention"],
-            "weather_snapshot": None,
+            "weather_snapshot": weather_risk,
             "created_at": created_at,
         }).execute()
     except Exception as e:
