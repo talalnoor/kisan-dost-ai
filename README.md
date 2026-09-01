@@ -5,6 +5,7 @@ AI-powered farming assistant for Pakistani farmers — built for the Alibaba Clo
 
 **Live backend:** https://kisan-dost-ai-production.up.railway.app
 **API docs (Swagger):** https://kisan-dost-ai-production.up.railway.app/docs
+**Live frontend:** https://kisan-dost-ai-rho.vercel.app
 
 ## What it does
 
