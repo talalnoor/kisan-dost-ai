@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiFetch, getToken } from "@/lib/api";
@@ -12,6 +12,28 @@ export default function ScanPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<any>(null);
+  const [cropId, setCropId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!getToken()) {
+      router.push("/");
+      return;
+    }
+    apiFetch("/api/v1/crops")
+      .then((res) => {
+        const crops = res.data.crops || [];
+        if (crops.length > 0) {
+          setCropId(crops[0].id);
+        } else {
+          // No crops yet — create a default one so scanning still works
+          return apiFetch("/api/v1/crops", {
+            method: "POST",
+            body: JSON.stringify({ crop_type: "My Crop", stage: "growing" }),
+          }).then((created) => setCropId(created.data.id));
+        }
+      })
+      .catch(() => {});
+  }, [router]);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
@@ -34,7 +56,7 @@ export default function ScanPage() {
 
     const formData = new FormData();
     formData.append("image", file);
-    formData.append("crop_id", "357ee5c7-1da2-4299-8b49-a75b14346d83"); // demo crop
+    formData.append("crop_id", cropId || "");
     formData.append("scan_type", "disease");
 
     // attach location for weather-risk if the browser allows it
