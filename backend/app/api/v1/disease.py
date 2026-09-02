@@ -409,14 +409,24 @@ async def analyze_disease(
     confidence = prediction["confidence"]
     low_confidence = confidence < 0.5
 
-    knowledge = MOCK_KNOWLEDGE.get(disease_label, {
-        "display_name": disease_label,
-        "severity": "unknown",
-        "symptoms": [],
-        "causes": [],
-        "treatment": [],
-        "prevention": [],
-    })
+    if disease_label == "invalid":
+        knowledge = {
+            "display_name": "No plant leaf detected",
+            "severity": "unknown",
+            "symptoms": ["The image does not appear to show a plant leaf"],
+            "causes": [],
+            "treatment": [],
+            "prevention": ["Please upload a clear photo of a single leaf, filling most of the frame"],
+        }
+    else:
+        knowledge = MOCK_KNOWLEDGE.get(disease_label, {
+            "display_name": disease_label,
+            "severity": "unknown",
+            "symptoms": [],
+            "causes": [],
+            "treatment": [],
+            "prevention": [],
+        })
 
     scan_id = str(uuid.uuid4())
     created_at = datetime.now(timezone.utc).isoformat()
