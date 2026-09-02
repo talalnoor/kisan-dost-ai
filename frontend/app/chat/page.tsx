@@ -4,7 +4,13 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiFetch, getToken } from "@/lib/api";
-
+function renderMarkdown(text: string) {
+  const html = text
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\n/g, "<br/>");
+  return { __html: html };
+}
 type Message = {
   role: "user" | "assistant";
   content: string;
@@ -97,7 +103,7 @@ export default function ChatPage() {
                     : "bg-white border border-gray-200 text-gray-800"
                 }`}
               >
-                {msg.content}
+                <span dangerouslySetInnerHTML={renderMarkdown(msg.content)} />
               </div>
             </div>
           ))}
