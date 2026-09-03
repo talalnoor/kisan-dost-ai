@@ -65,9 +65,10 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-gradient-to-b from-[#f8f6f0] to-[#eef0e5]">
       <header className="bg-[#1f3d1a] text-white px-6 py-4 flex items-center justify-between shadow-sm">
         <h1 className="font-heading text-xl font-bold flex items-center gap-2">🌾 Kisan Dost AI</h1>
-        <nav className="flex items-center gap-5 text-sm">
-          <Link href="/dashboard" className="font-semibold">Dashboard</Link>
-          <Link href="/scan" className="opacity-90 hover:opacity-100 transition">New Scan</Link>
+       <nav className="flex items-center gap-5 text-sm">
+  <Link href="/dashboard" className="font-semibold">Dashboard</Link>
+  <Link href="/tasks" className="opacity-90 hover:opacity-100 transition">Tasks</Link>
+  <Link href="/scan" className="opacity-90 hover:opacity-100 transition">New Scan</Link>
           <Link href="/chat" className="opacity-90 hover:opacity-100 transition">Assistant</Link>
           <button onClick={handleLogout} className="opacity-90 hover:opacity-100 transition">
             Logout
