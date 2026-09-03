@@ -64,25 +64,25 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f7f5f0] flex flex-col">
-      <header className="bg-[#2d4a2b] text-white px-6 py-4 flex items-center justify-between">
-        <h1 className="text-xl font-bold">Kisan Dost AI</h1>
+    <div className="min-h-screen bg-gradient-to-b from-[#f8f6f0] to-[#eef0e5] flex flex-col">
+      <header className="bg-[#1f3d1a] text-white px-6 py-4 flex items-center justify-between shadow-sm">
+        <h1 className="font-heading text-xl font-bold flex items-center gap-2">🌾 Kisan Dost AI</h1>
         <div className="flex items-center gap-4">
-          <div className="flex bg-white/10 rounded-lg overflow-hidden text-sm">
+          <div className="flex bg-white/10 rounded-full overflow-hidden text-sm p-0.5">
             <button
               onClick={() => setLanguage("en")}
-              className={`px-3 py-1 ${language === "en" ? "bg-white text-[#2d4a2b] font-medium" : ""}`}
+              className={`px-3 py-1 rounded-full transition ${language === "en" ? "bg-white text-[#1f3d1a] font-semibold" : ""}`}
             >
               EN
             </button>
             <button
               onClick={() => setLanguage("ur")}
-              className={`px-3 py-1 ${language === "ur" ? "bg-white text-[#2d4a2b] font-medium" : ""}`}
+              className={`px-3 py-1 rounded-full transition ${language === "ur" ? "bg-white text-[#1f3d1a] font-semibold" : ""}`}
             >
               اردو
             </button>
           </div>
-          <Link href="/dashboard" className="text-sm opacity-90 hover:opacity-100">
+          <Link href="/dashboard" className="text-sm opacity-90 hover:opacity-100 transition">
             ← Back
           </Link>
         </div>
@@ -91,27 +91,30 @@ export default function ChatPage() {
       <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-6 flex flex-col">
         <div className="flex-1 space-y-4 mb-4">
           {messages.length === 0 && (
-            <p className="text-center text-gray-400 text-sm mt-10">
-              Ask me anything about your crops, diseases, fertilizers, or irrigation.
-            </p>
+            <div className="text-center mt-16">
+              <div className="text-4xl mb-3">💬</div>
+              <p className="text-gray-400 text-sm">
+                Ask me anything about your crops, diseases, fertilizers, or irrigation.
+              </p>
+            </div>
           )}
           {messages.map((msg, i) => (
             <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
               <div
                 dir={language === "ur" ? "rtl" : "ltr"}
-                className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap ${
+                className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm shadow-sm ${
                   msg.role === "user"
-                    ? "bg-[#2d4a2b] text-white"
-                    : "bg-white border border-gray-200 text-gray-800"
+                    ? "bg-[#1f3d1a] text-white"
+                    : "bg-white border border-black/5 text-gray-800"
                 }`}
               >
-                {msg.content}
+                <span dangerouslySetInnerHTML={renderMarkdown(msg.content)} />
               </div>
             </div>
           ))}
           {loading && (
             <div className="flex justify-start">
-              <div className="bg-white border border-gray-200 rounded-2xl px-4 py-2.5 text-sm text-gray-400">
+              <div className="bg-white border border-black/5 rounded-2xl px-4 py-2.5 text-sm text-gray-400 shadow-sm">
                 Typing...
               </div>
             </div>
@@ -126,12 +129,12 @@ export default function ChatPage() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
             placeholder={language === "ur" ? "اپنا سوال لکھیں..." : "Ask a question..."}
-            className="flex-1 px-4 py-2.5 rounded-full border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#2d4a2b]"
+            className="flex-1 px-4 py-2.5 rounded-full border border-gray-300 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-[#1f3d1a]/40 transition"
           />
           <button
             onClick={handleSend}
             disabled={loading || !input.trim()}
-            className="bg-[#2d4a2b] text-white px-5 py-2.5 rounded-full font-medium hover:bg-[#1f3520] transition disabled:opacity-50"
+            className="bg-[#1f3d1a] text-white px-5 py-2.5 rounded-full font-semibold hover:bg-[#2d5527] transition disabled:opacity-50 shadow-sm"
           >
             Send
           </button>
