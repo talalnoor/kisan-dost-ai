@@ -54,6 +54,7 @@ export default function TasksPage() {
           <Link href="/dashboard" className="opacity-90 hover:opacity-100 transition">Dashboard</Link>
           <Link href="/tasks" className="font-semibold">Tasks</Link>
           <Link href="/chat" className="opacity-90 hover:opacity-100 transition">Assistant</Link>
+          <Link href="/crops" className="opacity-90 hover:opacity-100 transition">Crops</Link>
           <button onClick={() => { clearToken(); router.push("/"); }} className="opacity-90 hover:opacity-100 transition">
             Logout
           </button>

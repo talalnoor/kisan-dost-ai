@@ -69,6 +69,7 @@ export default function DashboardPage() {
   <Link href="/dashboard" className="font-semibold">Dashboard</Link>
   <Link href="/tasks" className="opacity-90 hover:opacity-100 transition">Tasks</Link>
   <Link href="/scan" className="opacity-90 hover:opacity-100 transition">New Scan</Link>
+  <Link href="/crops" className="opacity-90 hover:opacity-100 transition">Crops</Link>
           <Link href="/chat" className="opacity-90 hover:opacity-100 transition">Assistant</Link>
           <button onClick={handleLogout} className="opacity-90 hover:opacity-100 transition">
             Logout
