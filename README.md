@@ -1,4 +1,3 @@
-
 # Kisan Dost AI 🌾
 
 AI-powered farming assistant for Pakistani farmers — built for the Alibaba Cloud AI Hackathon (Bano Qabil / Alkhidmat Foundation Pakistan).
@@ -27,18 +26,28 @@ Farmers upload a photo of a diseased crop leaf and get an instant diagnosis — 
 - **Weather:** OpenWeatherMap
 - **Frontend:** Next.js, TypeScript, Tailwind CSS (deployed on Vercel)
 
-## Working features (backend)
+## Working features
 
 - ✅ Authentication (signup, login, JWT verification)
 - ✅ Crop management (CRUD)
-- ✅ Disease detection with structured knowledge base and confidence handling
+- ✅ Real AI disease detection (HuggingFace ViT model, 38 disease/healthy classes across tomato, potato, corn, apple, grape, etc.) with confidence handling and graceful fallback
 - ✅ Weather-integrated disease risk assessment
 - ✅ Scan history
 - ✅ Farming task tracking
-- ✅ Bilingual AI farming assistant (Qwen LLM)
+- ✅ Bilingual AI farming assistant (Qwen LLM) — safety-checked to avoid giving unverified exact fertilizer dosages
 - ✅ Live weather data
+- ✅ Full frontend: login, signup, dashboard (with live stats), scan/diagnose, chat — deployed and live
 
-**Note:** disease/pest image classification currently uses a mock CV prediction — see `docs/ai/ai-pipeline.md` for the plan to swap in a real pretrained model.
+## Local setup (frontend)
+
+```bash
+cd frontend
+npm install
+cp .env.example .env.local   # set NEXT_PUBLIC_API_URL to the live backend or localhost:8000
+npm run dev
+```
+
+Runs at `http://localhost:3000`.
 
 ## Documentation
 
