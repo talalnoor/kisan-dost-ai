@@ -24,6 +24,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const [crops, setCrops] = useState<Crop[]>([]);
   const [scans, setScans] = useState<Scan[]>([]);
+  const [weather, setWeather] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -37,6 +38,15 @@ export default function DashboardPage() {
         setCrops(cropsResult.data.crops || []);
         const historyResult = await apiFetch("/api/v1/history");
         setScans(historyResult.data.scans || []);
+
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(async (pos) => {
+            try {
+              const w = await apiFetch(`/api/v1/weather?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`);
+              setWeather(w.data);
+            } catch {}
+          });
+        }
       } catch (err) {
         console.error(err);
       } finally {
@@ -80,6 +90,28 @@ export default function DashboardPage() {
           <p className="text-gray-500">Loading...</p>
         ) : (
           <>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
+              <div className="bg-white rounded-2xl p-5 border border-black/5 shadow-sm">
+                <p className="text-xs font-bold text-[#8a7a5c] uppercase tracking-widest mb-1">Crops</p>
+                <p className="font-heading text-3xl font-extrabold text-[#1f3d1a]">{crops.length}</p>
+              </div>
+              <div className="bg-white rounded-2xl p-5 border border-black/5 shadow-sm">
+                <p className="text-xs font-bold text-[#8a7a5c] uppercase tracking-widest mb-1">Total Scans</p>
+                <p className="font-heading text-3xl font-extrabold text-[#1f3d1a]">{scans.length}</p>
+              </div>
+              <div className="bg-white rounded-2xl p-5 border border-black/5 shadow-sm">
+                <p className="text-xs font-bold text-[#8a7a5c] uppercase tracking-widest mb-1">Weather</p>
+                {weather ? (
+                  <p className="font-heading text-3xl font-extrabold text-[#1f3d1a]">
+                    {Math.round(weather.temperature)}°C
+                    <span className="text-sm font-normal text-gray-500 ml-2 capitalize">{weather.condition}</span>
+                  </p>
+                ) : (
+                  <p className="text-sm text-gray-400 mt-2">Enable location to see weather</p>
+                )}
+              </div>
+            </div>
+
             <section className="mb-10">
               <h3 className="text-xs font-bold text-[#8a7a5c] uppercase tracking-widest mb-3">
                 Your Crops
