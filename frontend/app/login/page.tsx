@@ -1,13 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiFetch, setToken } from "@/lib/api";
 
-export default function SignupPage() {
+export default function LoginPage() {
   const router = useRouter();
-  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -18,18 +16,14 @@ export default function SignupPage() {
     setError("");
     setLoading(true);
     try {
-      const result = await apiFetch("/api/v1/auth/signup", {
+      const result = await apiFetch("/api/v1/auth/login", {
         method: "POST",
-        body: JSON.stringify({ email, password, full_name: fullName, preferred_language: "en" }),
+        body: JSON.stringify({ email, password }),
       });
-      if (result.session?.access_token) {
-        setToken(result.session.access_token);
-        router.push("/dashboard");
-      } else {
-        router.push("/login");
-      }
+      setToken(result.access_token);
+      router.push("/dashboard");
     } catch (err: any) {
-      setError(err.message || "Signup failed");
+      setError(err.message || "Login failed");
     } finally {
       setLoading(false);
     }
@@ -44,21 +38,12 @@ export default function SignupPage() {
             Kisan Dost AI
           </h1>
         </div>
-        <p className="text-sm text-gray-500 mb-8 ml-1">Create your account.</p>
+        <p className="text-sm text-gray-500 mb-8 ml-1">Your farming assistant, in your hand.</p>
 
         <form
           onSubmit={handleSubmit}
           className="space-y-4 bg-white/70 backdrop-blur-sm p-6 rounded-2xl border border-black/5 shadow-sm"
         >
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-            <input
-              required
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#1f3d1a]/40 transition"
-            />
-          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
             <input
@@ -67,6 +52,7 @@ export default function SignupPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-4 py-2.5 rounded-xl border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#1f3d1a]/40 transition"
+              placeholder="you@example.com"
             />
           </div>
           <div>
@@ -74,10 +60,10 @@ export default function SignupPage() {
             <input
               type="password"
               required
-              minLength={6}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-4 py-2.5 rounded-xl border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#1f3d1a]/40 transition"
+              placeholder="••••••••"
             />
           </div>
 
@@ -90,11 +76,14 @@ export default function SignupPage() {
             disabled={loading}
             className="w-full bg-[#1f3d1a] text-white py-2.5 rounded-xl font-semibold hover:bg-[#2d5527] transition disabled:opacity-50 shadow-sm"
           >
-            {loading ? "Creating account..." : "Sign Up"}
+            {loading ? "Signing in..." : "Sign In"}
           </button>
 
           <p className="text-center text-sm text-gray-600">
-            Already have an account? <Link href="/" className="text-[#1f3d1a] font-semibold hover:underline">Sign in</Link>
+            New here?{" "}
+            <a href="/signup" className="text-[#1f3d1a] font-semibold hover:underline">
+              Create an account
+            </a>
           </p>
         </form>
       </div>

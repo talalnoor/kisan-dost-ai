@@ -24,7 +24,7 @@ export default function CropsPage() {
 
   useEffect(() => {
     if (!getToken()) {
-      router.push("/");
+    router.push("/login");
       return;
     }
     apiFetch("/api/v1/crops")

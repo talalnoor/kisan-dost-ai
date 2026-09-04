@@ -22,7 +22,7 @@ export default function TasksPage() {
 
   useEffect(() => {
     if (!getToken()) {
-      router.push("/");
+     router.push("/login");
       return;
     }
     apiFetch("/api/v1/tasks")

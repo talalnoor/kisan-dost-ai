@@ -29,7 +29,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!getToken()) {
-      router.push("/");
+      router.push("/login");
       return;
     }
     async function load() {

@@ -31,7 +31,7 @@ export default function ChatPage() {
   const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
-    if (!getToken()) router.push("/");
+    if (!getToken()) router.push("/login");
   }, [router]);
 
   useEffect(() => {

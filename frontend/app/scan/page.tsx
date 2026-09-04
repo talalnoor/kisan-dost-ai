@@ -49,7 +49,7 @@ export default function ScanPage() {
   async function handleAnalyze() {
     if (!file) return;
     if (!getToken()) {
-      router.push("/");
+     router.push("/login");
       return;
     }
     setLoading(true);
