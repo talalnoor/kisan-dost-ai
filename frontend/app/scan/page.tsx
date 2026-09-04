@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -60,7 +58,7 @@ export default function ScanPage() {
     const formData = new FormData();
     formData.append("image", file);
     formData.append("crop_id", cropId || "");
-    formData.append("scan_type", "disease");
+    formData.append("scan_type", scanType);
 
     // attach location for weather-risk if the browser allows it
     if (navigator.geolocation) {
@@ -111,7 +109,31 @@ export default function ScanPage() {
       </header>
 
       <main className="max-w-2xl mx-auto px-6 py-10">
-        <h2 className="font-heading text-3xl font-extrabold text-[#1f3d1a] mb-6">Scan a Crop</h2>
+        <h2 className="font-heading text-3xl font-extrabold text-[#1f3d1a] mb-4">Scan a Crop</h2>
+
+        {!result && (
+          <div className="mb-4">
+            <div className="flex bg-white rounded-xl border border-black/5 shadow-sm p-1 w-fit">
+              <button
+                onClick={() => setScanType("disease")}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${scanType === "disease" ? "bg-[#1f3d1a] text-white" : "text-gray-500"}`}
+              >
+                🍃 Disease
+              </button>
+              <button
+                onClick={() => setScanType("pest")}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${scanType === "pest" ? "bg-[#1f3d1a] text-white" : "text-gray-500"}`}
+              >
+                🐛 Pest
+              </button>
+            </div>
+            {scanType === "pest" && (
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-2">
+                Pest-specific detection is in early development — results currently come from our disease-focused model and may be less accurate for pest damage.
+              </p>
+            )}
+          </div>
+        )}
 
         {!result && (
           <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-6">
