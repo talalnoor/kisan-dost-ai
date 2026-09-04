@@ -25,7 +25,10 @@ export default function ChatPage() {
   const [language, setLanguage] = useState<"en" | "ur">("en");
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [voiceSupported, setVoiceSupported] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
     if (!getToken()) router.push("/");
@@ -34,6 +37,51 @@ export default function ChatPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      setVoiceSupported(true);
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setInput(transcript);
+        setListening(false);
+      };
+      recognition.onerror = () => setListening(false);
+      recognition.onend = () => setListening(false);
+      recognitionRef.current = recognition;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (recognitionRef.current) {
+      recognitionRef.current.lang = language === "ur" ? "ur-PK" : "en-US";
+    }
+  }, [language]);
+
+  function toggleListening() {
+    if (!recognitionRef.current) return;
+    if (listening) {
+      recognitionRef.current.stop();
+      setListening(false);
+    } else {
+      recognitionRef.current.start();
+      setListening(true);
+    }
+  }
+
+  function speak(text: string) {
+    if (!("speechSynthesis" in window)) return;
+    const plain = text.replace(/\*\*/g, "").replace(/\n/g, " ");
+    const utterance = new SpeechSynthesisUtterance(plain);
+    utterance.lang = language === "ur" ? "ur-PK" : "en-US";
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+  }
 
   async function handleSend() {
     if (!input.trim()) return;
@@ -53,6 +101,7 @@ export default function ChatPage() {
       });
       setSessionId(res.data.session_id);
       setMessages((prev) => [...prev, { role: "assistant", content: res.data.reply }]);
+      speak(res.data.reply);
     } catch (err: any) {
       setMessages((prev) => [
         ...prev,
@@ -95,6 +144,7 @@ export default function ChatPage() {
               <div className="text-4xl mb-3">💬</div>
               <p className="text-gray-400 text-sm">
                 Ask me anything about your crops, diseases, fertilizers, or irrigation.
+                {voiceSupported && " Tap the mic to speak."}
               </p>
             </div>
           )}
@@ -109,6 +159,15 @@ export default function ChatPage() {
                 }`}
               >
                 <span dangerouslySetInnerHTML={renderMarkdown(msg.content)} />
+                {msg.role === "assistant" && (
+                  <button
+                    onClick={() => speak(msg.content)}
+                    className="ml-2 text-gray-400 hover:text-[#1f3d1a] align-middle"
+                    title="Read aloud"
+                  >
+                    🔊
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -123,12 +182,23 @@ export default function ChatPage() {
         </div>
 
         <div className="flex gap-2 sticky bottom-4">
+          {voiceSupported && (
+            <button
+              onClick={toggleListening}
+              className={`px-4 py-2.5 rounded-full font-semibold shadow-sm transition ${
+                listening ? "bg-red-600 text-white animate-pulse" : "bg-white border border-gray-300 text-[#1f3d1a]"
+              }`}
+              title="Speak your question"
+            >
+              🎤
+            </button>
+          )}
           <input
             dir={language === "ur" ? "rtl" : "ltr"}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
-            placeholder={language === "ur" ? "اپنا سوال لکھیں..." : "Ask a question..."}
+            placeholder={language === "ur" ? "اپنا سوال لکھیں یا بولیں..." : "Ask or speak a question..."}
             className="flex-1 px-4 py-2.5 rounded-full border border-gray-300 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-[#1f3d1a]/40 transition"
           />
           <button
