@@ -89,7 +89,18 @@ export default function DashboardPage() {
         </div>
 
         {loading ? (
-          <p className="text-gray-500">Loading...</p>
+         <div className="space-y-8 animate-pulse">
+  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    {[1, 2, 3].map((i) => (
+      <div key={i} className="bg-white rounded-2xl p-5 border border-black/5 h-24">
+        <div className="h-3 w-16 bg-gray-200 rounded mb-3" />
+        <div className="h-7 w-12 bg-gray-200 rounded" />
+      </div>
+    ))}
+  </div>
+  <div className="h-4 w-24 bg-gray-200 rounded" />
+  <div className="bg-white rounded-2xl p-4 border border-black/5 h-16" />
+</div>
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
@@ -119,8 +130,14 @@ export default function DashboardPage() {
                 Your Crops
               </h3>
               {crops.length === 0 ? (
-                <p className="text-gray-500 text-sm">No crops added yet.</p>
-              ) : (
+  <div className="bg-white rounded-2xl p-8 border border-dashed border-gray-300 text-center">
+    <div className="text-3xl mb-2">🌱</div>
+    <p className="text-gray-500 text-sm mb-3">No crops added yet.</p>
+    <Link href="/crops" className="text-[#1f3d1a] text-sm font-semibold hover:underline">
+      + Add your first crop
+    </Link>
+  </div>
+) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {crops.map((crop) => (
                     <div key={crop.id} className="bg-white rounded-2xl p-4 border border-black/5 shadow-sm hover:shadow-md transition">
