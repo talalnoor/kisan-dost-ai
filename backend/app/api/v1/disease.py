@@ -425,12 +425,31 @@ async def analyze_disease(
     if len(image_bytes) > MAX_IMAGE_SIZE:
         raise HTTPException(status_code=400, detail={"code": "IMAGE_TOO_LARGE", "message": "Image exceeds 5MB limit"})
 
-    if scan_type == "pest":
-        prediction = get_pest_prediction(image_bytes)
-        detected_label = prediction["pest_label"]
+      if scan_type == "pest":
+        # Dedicated pest model caused memory issues on deploy; reverting
+        # to the disease model with an honest disclaimer instead of
+        # risking a crash before submission.
+        prediction = get_prediction(image_bytes)
+        detected_label = prediction["disease_label"]
         confidence = prediction["confidence"]
-        low_confidence = confidence < 0.5
-        knowledge = get_pest_knowledge(detected_label, prediction.get("raw_label", detected_label))
+        low_confidence = True
+
+        base_knowledge = MOCK_KNOWLEDGE.get(detected_label, {
+            "display_name": detected_label,
+            "severity": "unknown",
+            "symptoms": [],
+            "causes": [],
+            "treatment": [],
+            "prevention": [],
+        })
+        knowledge = {
+            "display_name": f"{base_knowledge['display_name']} (via our disease-focused model — dedicated pest detection isn't fully implemented yet)",
+            "severity": base_knowledge["severity"],
+            "symptoms": base_knowledge["symptoms"],
+            "causes": base_knowledge["causes"],
+            "treatment": base_knowledge["treatment"],
+            "prevention": base_knowledge["prevention"],
+        }
     else:
         prediction = get_prediction(image_bytes)
         detected_label = prediction["disease_label"]
