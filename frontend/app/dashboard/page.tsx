@@ -26,10 +26,11 @@ export default function DashboardPage() {
   const [scans, setScans] = useState<Scan[]>([]);
   const [weather, setWeather] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     if (!getToken()) {
-      router.push("/login");
+      router.push("/");
       return;
     }
     async function load() {
@@ -63,18 +64,31 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#f8f6f0] to-[#eef0e5]">
-      <header className="bg-[#1f3d1a] text-white px-6 py-4 flex items-center justify-between shadow-sm">
+      <header className="bg-[#1f3d1a] text-white px-6 py-4 flex items-center justify-between shadow-sm relative">
         <h1 className="font-heading text-xl font-bold flex items-center gap-2">🌾 Kisan Dost AI</h1>
-       <nav className="flex items-center gap-5 text-sm">
-  <Link href="/dashboard" className="font-semibold">Dashboard</Link>
-  <Link href="/tasks" className="opacity-90 hover:opacity-100 transition">Tasks</Link>
-  <Link href="/scan" className="opacity-90 hover:opacity-100 transition">New Scan</Link>
-  <Link href="/crops" className="opacity-90 hover:opacity-100 transition">Crops</Link>
+        <nav className="hidden sm:flex items-center gap-5 text-sm">
+          <Link href="/dashboard" className="font-semibold">Dashboard</Link>
+          <Link href="/crops" className="opacity-90 hover:opacity-100 transition">Crops</Link>
+          <Link href="/tasks" className="opacity-90 hover:opacity-100 transition">Tasks</Link>
+          <Link href="/scan" className="opacity-90 hover:opacity-100 transition">New Scan</Link>
           <Link href="/chat" className="opacity-90 hover:opacity-100 transition">Assistant</Link>
           <button onClick={handleLogout} className="opacity-90 hover:opacity-100 transition">
             Logout
           </button>
         </nav>
+        <button onClick={() => setMenuOpen(!menuOpen)} className="sm:hidden text-2xl leading-none">
+          {menuOpen ? "✕" : "☰"}
+        </button>
+        {menuOpen && (
+          <div className="absolute top-full left-0 right-0 bg-[#1f3d1a] flex flex-col text-sm shadow-lg sm:hidden z-20">
+            <Link href="/dashboard" className="px-6 py-3 border-t border-white/10 font-semibold" onClick={() => setMenuOpen(false)}>Dashboard</Link>
+            <Link href="/crops" className="px-6 py-3 border-t border-white/10" onClick={() => setMenuOpen(false)}>Crops</Link>
+            <Link href="/tasks" className="px-6 py-3 border-t border-white/10" onClick={() => setMenuOpen(false)}>Tasks</Link>
+            <Link href="/scan" className="px-6 py-3 border-t border-white/10" onClick={() => setMenuOpen(false)}>New Scan</Link>
+            <Link href="/chat" className="px-6 py-3 border-t border-white/10" onClick={() => setMenuOpen(false)}>Assistant</Link>
+            <button onClick={handleLogout} className="px-6 py-3 border-t border-white/10 text-left">Logout</button>
+          </div>
+        )}
       </header>
 
       <main className="max-w-4xl mx-auto px-6 py-10">
@@ -89,18 +103,18 @@ export default function DashboardPage() {
         </div>
 
         {loading ? (
-         <div className="space-y-8 animate-pulse">
-  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-    {[1, 2, 3].map((i) => (
-      <div key={i} className="bg-white rounded-2xl p-5 border border-black/5 h-24">
-        <div className="h-3 w-16 bg-gray-200 rounded mb-3" />
-        <div className="h-7 w-12 bg-gray-200 rounded" />
-      </div>
-    ))}
-  </div>
-  <div className="h-4 w-24 bg-gray-200 rounded" />
-  <div className="bg-white rounded-2xl p-4 border border-black/5 h-16" />
-</div>
+          <div className="space-y-8 animate-pulse">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="bg-white rounded-2xl p-5 border border-black/5 h-24">
+                  <div className="h-3 w-16 bg-gray-200 rounded mb-3" />
+                  <div className="h-7 w-12 bg-gray-200 rounded" />
+                </div>
+              ))}
+            </div>
+            <div className="h-4 w-24 bg-gray-200 rounded" />
+            <div className="bg-white rounded-2xl p-4 border border-black/5 h-16" />
+          </div>
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
@@ -130,14 +144,14 @@ export default function DashboardPage() {
                 Your Crops
               </h3>
               {crops.length === 0 ? (
-  <div className="bg-white rounded-2xl p-8 border border-dashed border-gray-300 text-center">
-    <div className="text-3xl mb-2">🌱</div>
-    <p className="text-gray-500 text-sm mb-3">No crops added yet.</p>
-    <Link href="/crops" className="text-[#1f3d1a] text-sm font-semibold hover:underline">
-      + Add your first crop
-    </Link>
-  </div>
-) : (
+                <div className="bg-white rounded-2xl p-8 border border-dashed border-gray-300 text-center">
+                  <div className="text-3xl mb-2">🌱</div>
+                  <p className="text-gray-500 text-sm mb-3">No crops added yet.</p>
+                  <Link href="/crops" className="text-[#1f3d1a] text-sm font-semibold hover:underline">
+                    + Add your first crop
+                  </Link>
+                </div>
+              ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {crops.map((crop) => (
                     <div key={crop.id} className="bg-white rounded-2xl p-4 border border-black/5 shadow-sm hover:shadow-md transition">
