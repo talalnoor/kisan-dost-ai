@@ -202,7 +202,7 @@ export default function ChatPage() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
             placeholder={language === "ur" ? "اپنا سوال لکھیں یا بولیں..." : "Ask or speak a question..."}
-            className="flex-1 px-4 py-2.5 rounded-full border border-gray-300 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-[#1f3d1a]/40 transition"
+            className="flex-1 min-w-0 px-4 py-2.5 rounded-full border border-gray-300 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-[#1f3d1a]/40 transition"
           />
           <button
             onClick={handleSend}
