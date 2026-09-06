@@ -147,7 +147,7 @@ const [menuOpen, setMenuOpen] = useState(false);
             </div>
             {scanType === "pest" && (
               <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-2">
-                Pest-specific detection is in early development — results currently come from our disease-focused model and may be less accurate for pest damage.
+                Pest identification uses a general insect-classification model covering common farm pests — it isn't fine-tuned specifically for Pakistani crop conditions yet, so treat results as a starting point and confirm with your local agricultural extension office before treating.
               </p>
             )}
           </div>
