@@ -6,8 +6,6 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, H
 from supabase import create_client, Client
 from app.core.security import get_current_user, get_user_id
 from app.providers.cv.hf_plant_model import real_cv_predict
-from app.providers.cv.hf_pest_model import real_pest_predict
-from app.providers.knowledge.pest_knowledge import get_pest_knowledge
 
 router = APIRouter(prefix="/api/v1/disease", tags=["disease"])
 
@@ -62,14 +60,6 @@ def mock_cv_predict(image_bytes: bytes) -> dict:
     return {"disease_label": "tomato_early_blight", "confidence": 0.87}
 
 
-def mock_pest_predict(image_bytes: bytes) -> dict:
-    """
-    FALLBACK ONLY. Used when the real HF pest model call fails.
-    Must keep returning this exact shape: {pest_label, confidence}.
-    """
-    return {"pest_label": "aphid", "confidence": 0.7}
-
-
 def get_prediction(image_bytes: bytes) -> dict:
     """
     Tries the real CV model first; falls back to the mock prediction
@@ -82,17 +72,6 @@ def get_prediction(image_bytes: bytes) -> dict:
     except Exception as e:
         print(f"[CV FALLBACK] real_cv_predict failed, using mock: {e}")
         return mock_cv_predict(image_bytes)
-
-
-def get_pest_prediction(image_bytes: bytes) -> dict:
-    """
-    Same fallback pattern as get_prediction, for the pest model.
-    """
-    try:
-        return real_pest_predict(image_bytes)
-    except Exception as e:
-        print(f"[PEST FALLBACK] real_pest_predict failed, using mock: {e}")
-        return mock_pest_predict(image_bytes)
 
 
 # Knowledge base covering all 38 PlantVillage classes the CV model
@@ -425,55 +404,29 @@ async def analyze_disease(
     if len(image_bytes) > MAX_IMAGE_SIZE:
         raise HTTPException(status_code=400, detail={"code": "IMAGE_TOO_LARGE", "message": "Image exceeds 5MB limit"})
 
-      if scan_type == "pest":
-        # Dedicated pest model caused memory issues on deploy; reverting
-        # to the disease model with an honest disclaimer instead of
-        # risking a crash before submission.
-        prediction = get_prediction(image_bytes)
-        detected_label = prediction["disease_label"]
-        confidence = prediction["confidence"]
-        low_confidence = True
+    prediction = get_prediction(image_bytes)
+    disease_label = prediction["disease_label"]
+    confidence = prediction["confidence"]
+    low_confidence = confidence < 0.5
 
-        base_knowledge = MOCK_KNOWLEDGE.get(detected_label, {
-            "display_name": detected_label,
+    if disease_label == "invalid":
+        knowledge = {
+            "display_name": "No plant leaf detected",
+            "severity": "unknown",
+            "symptoms": ["The image does not appear to show a plant leaf"],
+            "causes": [],
+            "treatment": [],
+            "prevention": ["Please upload a clear photo of a single leaf, filling most of the frame"],
+        }
+    else:
+        knowledge = MOCK_KNOWLEDGE.get(disease_label, {
+            "display_name": disease_label,
             "severity": "unknown",
             "symptoms": [],
             "causes": [],
             "treatment": [],
             "prevention": [],
         })
-        knowledge = {
-            "display_name": f"{base_knowledge['display_name']} (via our disease-focused model — dedicated pest detection isn't fully implemented yet)",
-            "severity": base_knowledge["severity"],
-            "symptoms": base_knowledge["symptoms"],
-            "causes": base_knowledge["causes"],
-            "treatment": base_knowledge["treatment"],
-            "prevention": base_knowledge["prevention"],
-        }
-    else:
-        prediction = get_prediction(image_bytes)
-        detected_label = prediction["disease_label"]
-        confidence = prediction["confidence"]
-        low_confidence = confidence < 0.5
-
-        if detected_label == "invalid":
-            knowledge = {
-                "display_name": "No plant leaf detected",
-                "severity": "unknown",
-                "symptoms": ["The image does not appear to show a plant leaf"],
-                "causes": [],
-                "treatment": [],
-                "prevention": ["Please upload a clear photo of a single leaf, filling most of the frame"],
-            }
-        else:
-            knowledge = MOCK_KNOWLEDGE.get(detected_label, {
-                "display_name": detected_label,
-                "severity": "unknown",
-                "symptoms": [],
-                "causes": [],
-                "treatment": [],
-                "prevention": [],
-            })
 
     scan_id = str(uuid.uuid4())
     created_at = datetime.now(timezone.utc).isoformat()
@@ -503,7 +456,7 @@ async def analyze_disease(
             "user_id": user_id,
             "crop_id": crop_id,
             "scan_type": scan_type,
-            "disease_label": detected_label,
+            "disease_label": disease_label,
             "disease_display_name": knowledge["display_name"],
             "confidence": confidence,
             "severity": knowledge["severity"],
