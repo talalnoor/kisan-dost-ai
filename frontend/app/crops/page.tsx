@@ -21,7 +21,7 @@ export default function CropsPage() {
   const [stage, setStage] = useState("seedling");
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
-
+const [menuOpen, setMenuOpen] = useState(false);
   useEffect(() => {
     if (!getToken()) {
     router.push("/login");
@@ -50,18 +50,30 @@ export default function CropsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#f8f6f0] to-[#eef0e5]">
-      <header className="bg-[#1f3d1a] text-white px-6 py-4 flex items-center justify-between shadow-sm">
-        <h1 className="font-heading text-xl font-bold flex items-center gap-2">🌾 Kisan Dost AI</h1>
-        <nav className="flex items-center gap-5 text-sm">
-          <Link href="/dashboard" className="opacity-90 hover:opacity-100 transition">Dashboard</Link>
-          <Link href="/crops" className="font-semibold">Crops</Link>
-          <Link href="/tasks" className="opacity-90 hover:opacity-100 transition">Tasks</Link>
-          <Link href="/chat" className="opacity-90 hover:opacity-100 transition">Assistant</Link>
-          <button onClick={() => { clearToken(); router.push("/"); }} className="opacity-90 hover:opacity-100 transition">
-            Logout
-          </button>
-        </nav>
-      </header>
+    <header className="bg-[#1f3d1a] text-white px-6 py-4 flex items-center justify-between shadow-sm relative">
+  <h1 className="font-heading text-xl font-bold flex items-center gap-2">🌾 Kisan Dost AI</h1>
+  <nav className="hidden sm:flex items-center gap-5 text-sm">
+    <Link href="/dashboard" className="opacity-90 hover:opacity-100 transition">Dashboard</Link>
+    <Link href="/crops" className="opacity-90 hover:opacity-100 transition">Crops</Link>
+    <Link href="/tasks" className="opacity-90 hover:opacity-100 transition">Tasks</Link>
+    <Link href="/scan" className="opacity-90 hover:opacity-100 transition">New Scan</Link>
+    <Link href="/chat" className="opacity-90 hover:opacity-100 transition">Assistant</Link>
+    <button onClick={() => { clearToken(); router.push("/login"); }} className="opacity-90 hover:opacity-100 transition">Logout</button>
+  </nav>
+  <button onClick={() => setMenuOpen(!menuOpen)} className="sm:hidden text-2xl leading-none">
+    {menuOpen ? "✕" : "☰"}
+  </button>
+  {menuOpen && (
+    <div className="absolute top-full left-0 right-0 bg-[#1f3d1a] flex flex-col text-sm shadow-lg sm:hidden z-20">
+      <Link href="/dashboard" className="px-6 py-3 border-t border-white/10" onClick={() => setMenuOpen(false)}>Dashboard</Link>
+      <Link href="/crops" className="px-6 py-3 border-t border-white/10" onClick={() => setMenuOpen(false)}>Crops</Link>
+      <Link href="/tasks" className="px-6 py-3 border-t border-white/10" onClick={() => setMenuOpen(false)}>Tasks</Link>
+      <Link href="/scan" className="px-6 py-3 border-t border-white/10" onClick={() => setMenuOpen(false)}>New Scan</Link>
+      <Link href="/chat" className="px-6 py-3 border-t border-white/10" onClick={() => setMenuOpen(false)}>Assistant</Link>
+      <button onClick={() => { clearToken(); router.push("/login"); }} className="px-6 py-3 border-t border-white/10 text-left">Logout</button>
+    </div>
+  )}
+</header>
 
       <main className="max-w-2xl mx-auto px-6 py-10">
         <h2 className="font-heading text-3xl font-extrabold text-[#1f3d1a] mb-6">My Crops</h2>

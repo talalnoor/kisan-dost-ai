@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { apiFetch, getToken } from "@/lib/api";
+import { apiFetch, getToken, clearToken } from "@/lib/api";
 
 function renderMarkdown(text: string) {
   const html = text
@@ -27,6 +27,7 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
 
@@ -114,28 +115,30 @@ export default function ChatPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#f8f6f0] to-[#eef0e5] flex flex-col">
-      <header className="bg-[#1f3d1a] text-white px-6 py-4 flex items-center justify-between shadow-sm">
-        <h1 className="font-heading text-xl font-bold flex items-center gap-2">🌾 Kisan Dost AI</h1>
-        <div className="flex items-center gap-4">
-          <div className="flex bg-white/10 rounded-full overflow-hidden text-sm p-0.5">
-            <button
-              onClick={() => setLanguage("en")}
-              className={`px-3 py-1 rounded-full transition ${language === "en" ? "bg-white text-[#1f3d1a] font-semibold" : ""}`}
-            >
-              EN
-            </button>
-            <button
-              onClick={() => setLanguage("ur")}
-              className={`px-3 py-1 rounded-full transition ${language === "ur" ? "bg-white text-[#1f3d1a] font-semibold" : ""}`}
-            >
-              اردو
-            </button>
-          </div>
-          <Link href="/dashboard" className="text-sm opacity-90 hover:opacity-100 transition">
-            ← Back
-          </Link>
-        </div>
-      </header>
+      <header className="bg-[#1f3d1a] text-white px-6 py-4 flex items-center justify-between shadow-sm relative">
+  <h1 className="font-heading text-xl font-bold flex items-center gap-2">🌾 Kisan Dost AI</h1>
+  <nav className="hidden sm:flex items-center gap-5 text-sm">
+    <Link href="/dashboard" className="opacity-90 hover:opacity-100 transition">Dashboard</Link>
+    <Link href="/crops" className="opacity-90 hover:opacity-100 transition">Crops</Link>
+    <Link href="/tasks" className="opacity-90 hover:opacity-100 transition">Tasks</Link>
+    <Link href="/scan" className="opacity-90 hover:opacity-100 transition">New Scan</Link>
+    <Link href="/chat" className="opacity-90 hover:opacity-100 transition">Assistant</Link>
+    <button onClick={() => { clearToken(); router.push("/login"); }} className="opacity-90 hover:opacity-100 transition">Logout</button>
+  </nav>
+  <button onClick={() => setMenuOpen(!menuOpen)} className="sm:hidden text-2xl leading-none">
+    {menuOpen ? "✕" : "☰"}
+  </button>
+  {menuOpen && (
+    <div className="absolute top-full left-0 right-0 bg-[#1f3d1a] flex flex-col text-sm shadow-lg sm:hidden z-20">
+      <Link href="/dashboard" className="px-6 py-3 border-t border-white/10" onClick={() => setMenuOpen(false)}>Dashboard</Link>
+      <Link href="/crops" className="px-6 py-3 border-t border-white/10" onClick={() => setMenuOpen(false)}>Crops</Link>
+      <Link href="/tasks" className="px-6 py-3 border-t border-white/10" onClick={() => setMenuOpen(false)}>Tasks</Link>
+      <Link href="/scan" className="px-6 py-3 border-t border-white/10" onClick={() => setMenuOpen(false)}>New Scan</Link>
+      <Link href="/chat" className="px-6 py-3 border-t border-white/10" onClick={() => setMenuOpen(false)}>Assistant</Link>
+      <button onClick={() => { clearToken(); router.push("/login"); }} className="px-6 py-3 border-t border-white/10 text-left">Logout</button>
+    </div>
+  )}
+</header>
 
       <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-6 flex flex-col">
         <div className="flex-1 space-y-4 mb-4">
