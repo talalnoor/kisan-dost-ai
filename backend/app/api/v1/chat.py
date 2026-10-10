@@ -43,7 +43,11 @@ SYSTEM_PROMPT_EN = (
     "STRICT RULE: never state a specific fertilizer/chemical dosage number, percentage, or quantity "
     "(e.g. do not say '20-40 kg per acre' or '0.5% solution'). Instead, describe the general approach "
     "and always tell the farmer to confirm exact amounts with their local agricultural extension office "
-    "or product label before applying anything."
+    "or product label before applying anything. "
+    "LANGUAGE RULE: always answer in English. "
+    "FORMAT RULE: your answer is read aloud by a speaker, so write plain text only. "
+    "Do not use asterisks, bullet points, hash signs, bold, or markdown of any kind. "
+    "Write short sentences in short paragraphs, and use words like first, next, then, finally to give steps."
 )
 
 SYSTEM_PROMPT_UR = (
@@ -97,11 +101,23 @@ SYMBOLS = "*#_~`>•◦▪▫●○■□★☆٭‣⁃·∙◆◇►▶✓✔"
 LEADING_MARKER = re.compile(
     r"(?m)^[\s\u200e\u200f]*(?:[0-9\u06F0-\u06F9\u0660-\u0669]+\s*[\.\)\-:،]|[\-–—" + re.escape(SYMBOLS) + r"])+\s*"
 )
+# English replies keep digits and underscores, so their symbol list is shorter
+SYMBOLS_EN = "*#~`•◦▪▫●○■□★☆٭‣⁃∙◆◇►▶✓✔"
+LEADING_BULLET_EN = re.compile(r"(?m)^[ \t]*[\-–—" + re.escape(SYMBOLS_EN) + r"]+[ \t]+")
 
 
-def is_urdu_text(text: str) -> bool:
-    """True when the reply is mostly written in Urdu/Arabic script."""
-    return len(ARABIC_SCRIPT.findall(text)) >= 15
+def has_urdu_script(text: str, minimum: int = 3) -> bool:
+    """True when the text contains Urdu/Arabic script letters."""
+    return len(ARABIC_SCRIPT.findall(text or "")) >= minimum
+
+
+def pick_language(message: str, toggle: str) -> str:
+    """The language of the question wins over the site's language switch."""
+    if has_urdu_script(message, 2):
+        return "ur"
+    if re.search(r"[A-Za-z]", message):
+        return "en"
+    return toggle if toggle in ("ur", "en") else "en"
 
 
 def clean_urdu_reply(text: str) -> str:
@@ -123,8 +139,20 @@ def clean_urdu_reply(text: str) -> str:
     return text or original
 
 
+def clean_english_reply(text: str) -> str:
+    """Makes an English answer safe for the speaker: no stars, hashes, bullets or markdown marks."""
+    original = text
+    text = LEADING_BULLET_EN.sub("", text)
+    text = re.sub("[" + re.escape(SYMBOLS_EN) + "]", "", text)
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    text = re.sub(r"\n[ \t]+", "\n", text)
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()
+    return text or original
+
+
 def call_qwen(message: str, language: str, history: Optional[list] = None) -> str:
-    """Tries the main model first, then the fallback model if the main one fails."""
+    """Tries the main model first, then the fallback model if the main one fails.
+    `language` must already be the resolved language ("en" or "ur")."""
     if not DASHSCOPE_API_KEY:
         raise RuntimeError("DASHSCOPE_API_KEY is empty or not set")
 
@@ -134,12 +162,16 @@ def call_qwen(message: str, language: str, history: Optional[list] = None) -> st
         timeout=REQUEST_TIMEOUT,
         max_retries=0,
     )
-    # Use the Urdu prompt when the site says Urdu OR the farmer typed in Urdu script
-    use_urdu = language == "ur" or is_urdu_text(message)
+    use_urdu = language == "ur"
     system_prompt = SYSTEM_PROMPT_UR if use_urdu else SYSTEM_PROMPT_EN
 
+    # Keep only earlier messages in the same language, so the model does not copy the other one
+    same_language_history = [
+        h for h in (history or []) if has_urdu_script(h.get("content", "")) == use_urdu
+    ]
+
     messages = [{"role": "system", "content": system_prompt}]
-    messages.extend(history or [])
+    messages.extend(same_language_history)
     messages.append({"role": "user", "content": message})
 
     models = [DASHSCOPE_MODEL]
@@ -156,8 +188,10 @@ def call_qwen(message: str, language: str, history: Optional[list] = None) -> st
             if model != DASHSCOPE_MODEL:
                 print(f"[CHAT] answered by fallback model {model}")
             reply = reply.strip()
-            if use_urdu or is_urdu_text(reply):
+            if use_urdu:
                 reply = clean_urdu_reply(reply)
+            else:
+                reply = clean_english_reply(reply)
             return reply
         except Exception as e:
             last_error = e
@@ -185,7 +219,8 @@ def chat(
     if not message:
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
-    language = payload.language if payload.language in ("en", "ur") else "en"
+    # The language of the question decides the language of the answer
+    language = pick_language(message, payload.language)
 
     user_id = get_user_id(user)
     token = authorization.replace("Bearer ", "") if authorization else None
@@ -212,7 +247,7 @@ def chat(
     except Exception as e:
         debug_error = f"{type(e).__name__}: {e}"
         print(f"[CHAT FALLBACK] Qwen call failed ({debug_error}). Check DASHSCOPE_API_KEY / DASHSCOPE_BASE_URL / DASHSCOPE_MODEL")
-        reply = FALLBACK_REPLY_UR if (language == "ur" or is_urdu_text(message)) else FALLBACK_REPLY_EN
+        reply = FALLBACK_REPLY_UR if language == "ur" else FALLBACK_REPLY_EN
 
     created_at = datetime.now(timezone.utc).isoformat()
 
