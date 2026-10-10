@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/$/, "");
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -27,15 +27,34 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
     headers["Content-Type"] = "application/json";
   }
 
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      ...options,
+      headers,
+    });
+  } catch {
+    throw new Error(
+      `Cannot reach the server at ${API_URL}. Check that the backend is running and NEXT_PUBLIC_API_URL is correct.`
+    );
+  }
 
-  const data = await response.json();
+  let data: any = null;
+  try {
+    data = await response.json();
+  } catch {
+    // Non-JSON response (e.g. a 502 page from the host)
+  }
 
   if (!response.ok) {
-    throw new Error(data.detail?.message || data.detail || "Something went wrong");
+    const detail = data?.detail;
+    let message: string;
+    if (typeof detail === "string") message = detail;
+    else if (detail?.message) message = detail.message;
+    else if (Array.isArray(detail))
+      message = detail.map((d: any) => `${(d.loc || []).join(".")}: ${d.msg}`).join("; ");
+    else message = `Server error (${response.status})`;
+    throw new Error(message);
   }
 
   return data;

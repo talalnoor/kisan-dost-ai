@@ -6,6 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, H
 from supabase import create_client, Client
 from app.core.security import get_current_user, get_user_id
 from app.providers.cv.hf_plant_model import real_cv_predict
+from app.providers.cv.hf_pest_model import real_pest_predict
+from app.providers.knowledge.pest_knowledge import PEST_KNOWLEDGE
 
 router = APIRouter(prefix="/api/v1/disease", tags=["disease"])
 
@@ -13,8 +15,8 @@ supabase_url = os.environ.get("SUPABASE_URL")
 supabase_anon_key = os.environ.get("SUPABASE_ANON_KEY")
 weather_api_key = os.environ.get("WEATHER_API_KEY")
 
-MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB
-ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/jpg"}
+MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB (phone photos are often 5MB+)
+ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/jpg", "image/webp"}
 
 
 def get_weather_risk(lat: float, lon: float, humidity_threshold: int = 75) -> dict:
@@ -398,18 +400,36 @@ async def analyze_disease(
     user_id = get_user_id(user)
 
     if image.content_type not in ALLOWED_CONTENT_TYPES:
-        raise HTTPException(status_code=400, detail={"code": "INVALID_IMAGE", "message": "Only JPG/PNG images are supported"})
+        raise HTTPException(status_code=400, detail={"code": "INVALID_IMAGE", "message": "Only JPG, PNG or WEBP images are supported"})
 
     image_bytes = await image.read()
     if len(image_bytes) > MAX_IMAGE_SIZE:
-        raise HTTPException(status_code=400, detail={"code": "IMAGE_TOO_LARGE", "message": "Image exceeds 5MB limit"})
+        raise HTTPException(status_code=400, detail={"code": "IMAGE_TOO_LARGE", "message": "Image exceeds 10MB limit"})
 
-    prediction = get_prediction(image_bytes)
-    disease_label = prediction["disease_label"]
-    confidence = prediction["confidence"]
+    if scan_type == "pest":
+        try:
+            pest = real_pest_predict(image_bytes)
+            disease_label = pest["pest_label"]
+            confidence = pest["confidence"]
+        except Exception as e:
+            print(f"[PEST CV FAILED] {e}")
+            raise HTTPException(status_code=503, detail={"code": "PEST_MODEL_UNAVAILABLE", "message": "Pest detection is temporarily unavailable. Please try again."})
+    else:
+        prediction = get_prediction(image_bytes)
+        disease_label = prediction["disease_label"]
+        confidence = prediction["confidence"]
     low_confidence = confidence < 0.5
 
-    if disease_label == "invalid":
+    if scan_type == "pest":
+        knowledge = PEST_KNOWLEDGE.get(disease_label, {
+            "display_name": disease_label.replace("_", " ").title(),
+            "severity": "unknown",
+            "symptoms": [],
+            "causes": [],
+            "treatment": [],
+            "prevention": [],
+        })
+    elif disease_label == "invalid":
         knowledge = {
             "display_name": "No plant leaf detected",
             "severity": "unknown",

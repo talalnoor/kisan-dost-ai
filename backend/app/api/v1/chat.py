@@ -93,7 +93,8 @@ def chat(
 
     try:
         reply = call_qwen(payload.message, payload.language)
-    except Exception:
+    except Exception as e:
+        print(f"[CHAT FALLBACK] Qwen call failed (check DASHSCOPE_API_KEY / DASHSCOPE_BASE_URL): {e}")
         reply = FALLBACK_REPLY_UR if payload.language == "ur" else FALLBACK_REPLY_EN
 
     created_at = datetime.now(timezone.utc).isoformat()
@@ -111,8 +112,8 @@ def chat(
             "content": reply,
             "language": payload.language,
         }).execute()
-    except Exception:
-        pass  # don't fail the reply just because history logging failed
+    except Exception as e:
+        print(f"[CHAT] could not save chat history: {e}")
 
     return {
         "success": True,

@@ -33,7 +33,7 @@ const [menuOpen, setMenuOpen] = useState(false);
           }).then((created) => setCropId(created.data.id));
         }
       })
-      .catch(() => {});
+      .catch((err) => setError(err.message || "Could not load your crops"));
   }, [router]);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -48,6 +48,10 @@ const [menuOpen, setMenuOpen] = useState(false);
 
   async function handleAnalyze() {
     if (!file) return;
+    if (!cropId) {
+      setError("Your crop is not ready yet. Please wait a moment or add a crop first.");
+      return;
+    }
     if (!getToken()) {
      router.push("/login");
       return;
@@ -165,7 +169,7 @@ const [menuOpen, setMenuOpen] = useState(false);
                   <p className="text-xs text-gray-400 mt-1">JPG or PNG, up to 5MB</p>
                 </div>
               )}
-              <input type="file" accept="image/jpeg,image/png" onChange={handleFileChange} className="hidden" />
+              <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFileChange} className="hidden" />
             </label>
 
             {error && (

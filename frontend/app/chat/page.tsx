@@ -106,7 +106,7 @@ export default function ChatPage() {
     } catch (err: any) {
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: "Sorry, something went wrong. Please try again." },
+        { role: "assistant", content: `Sorry, something went wrong: ${err?.message || "please try again."}` },
       ]);
     } finally {
       setLoading(false);

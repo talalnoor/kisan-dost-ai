@@ -30,9 +30,11 @@ def get_current_user(authorization: str = Header(None)) -> dict:
             signing_key.key,
             algorithms=["ES256", "RS256"],
             audience="authenticated",
+            leeway=300,  # tolerate up to 5 minutes of clock difference
         )
         return payload
     except PyJWTError as e:
+        print(f"[AUTH ERROR] {type(e).__name__}: {e}")
         raise HTTPException(status_code=401, detail=f"Invalid or expired token: {str(e)}")
 
 
