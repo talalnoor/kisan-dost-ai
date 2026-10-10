@@ -53,8 +53,9 @@ SYSTEM_PROMPT_UR = (
     "سخت اصول: کبھی بھی کھاد یا کیمیکل کی مخصوص مقدار، فیصد یا وزن نہ بتائیں۔ "
     "اس کی بجائے عمومی طریقہ بتائیں اور ہمیشہ کسان کو مقامی زرعی محکمے یا پروڈکٹ لیبل سے صحیح مقدار معلوم کرنے کا مشورہ دیں۔ "
     "زبان کا اصول: صرف اردو (عربی رسم الخط) میں لکھیں۔ کوئی بھی انگریزی لفظ، قوسین میں انگریزی نام، یا ہندی، گرمکھی، تامل کے حروف ہرگز استعمال نہ کریں۔ "
-    "ہر چیز کے لیے آسان اردو لفظ استعمال کریں، مثلاً پھپھوندی، پھپھوندی کش دوا، جھلساؤ، کھاد۔ "
-    "فارمیٹ کا اصول: نمبر والی فہرست، ستارے، ہیش یا بلٹ نہ بنائیں۔ جواب کو چھوٹے سادہ جملوں اور چھوٹے پیراگرافوں میں لکھیں، "
+    "بیماریوں کے نام بھی اردو میں لکھیں، مثلاً اگیتا جھلساؤ اور پچھیتا جھلساؤ۔ "
+    "ہر چیز کے لیے آسان اردو لفظ استعمال کریں، مثلاً پھپھوندی، پھپھوندی کش دوا، کھاد۔ "
+    "فارمیٹ کا اصول: نمبر والی فہرست، ہندسے، ستارے، ہیش یا بلٹ نہ بنائیں۔ جواب کو چھوٹے سادہ جملوں اور چھوٹے پیراگرافوں میں لکھیں، "
     "اور ترتیب بتانے کے لیے لفظ جیسے سب سے پہلے، اس کے بعد، پھر، آخر میں استعمال کریں۔"
 )
 
@@ -91,16 +92,19 @@ def get_history(client: Client, session_id: str) -> list:
 
 
 def clean_urdu_reply(text: str) -> str:
-    """Makes an Urdu answer safe for the speaker: no bracketed English, list numbers or markdown marks."""
+    """Makes an Urdu answer safe for the speaker: no English words, digits, list numbers or markdown marks."""
     original = text
-    # remove anything in brackets that contains English letters, e.g. (Fungicide)
-    text = re.sub(r"\s*[\(\[][^\)\]]*[A-Za-z][^\)\]]*[\)\]]", "", text)
     # remove list numbers like "1." or "2)" at the start of a line
-    text = re.sub(r"(?m)^\s*\d+\s*[\.\)\-:]\s*", "", text)
+    text = re.sub(r"(?m)^\s*[0-9۰-۹]+\s*[\.\)\-:،]\s*", "", text)
     # remove bullets and markdown marks
     text = re.sub(r"(?m)^\s*[\*\-•]\s+", "", text)
     text = text.replace("**", "").replace("*", "").replace("#", "")
-    # tidy spaces and blank lines
+    # remove every English word and every digit
+    text = re.sub(r"[A-Za-z]+(?:[\-'][A-Za-z]+)*", "", text)
+    text = re.sub(r"[0-9]+(?:[\.,%][0-9]+)?%?", "", text)
+    # remove brackets left empty and tidy spacing/punctuation
+    text = re.sub(r"[\(\[]\s*[\)\]]", "", text)
+    text = re.sub(r"[ \t]+([،۔:؟!])", r"\1", text)
     text = re.sub(r"[ \t]{2,}", " ", text)
     text = re.sub(r"\n{3,}", "\n\n", text).strip()
     return text or original
