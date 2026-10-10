@@ -91,21 +91,34 @@ def get_history(client: Client, session_id: str) -> list:
         return []
 
 
+ARABIC_SCRIPT = re.compile(r"[\u0600-\u06FF]")
+# every kind of star, bullet, marker and markdown symbol the speaker could read aloud
+SYMBOLS = "*#_~`>•◦▪▫●○■□★☆٭‣⁃·∙◆◇►▶✓✔"
+LEADING_MARKER = re.compile(
+    r"(?m)^[\s\u200e\u200f]*(?:[0-9\u06F0-\u06F9\u0660-\u0669]+\s*[\.\)\-:،]|[\-–—" + re.escape(SYMBOLS) + r"])+\s*"
+)
+
+
+def is_urdu_text(text: str) -> bool:
+    """True when the reply is mostly written in Urdu/Arabic script."""
+    return len(ARABIC_SCRIPT.findall(text)) >= 15
+
+
 def clean_urdu_reply(text: str) -> str:
-    """Makes an Urdu answer safe for the speaker: no English words, digits, list numbers or markdown marks."""
+    """Makes an Urdu answer safe for the speaker: no English words, digits, list numbers, stars or bullets."""
     original = text
-    # remove list numbers like "1." or "2)" at the start of a line
-    text = re.sub(r"(?m)^\s*[0-9۰-۹]+\s*[\.\)\-:،]\s*", "", text)
-    # remove bullets and markdown marks
-    text = re.sub(r"(?m)^\s*[\*\-•]\s+", "", text)
-    text = text.replace("**", "").replace("*", "").replace("#", "")
-    # remove every English word and every digit
+    # list numbers and bullets at the start of a line
+    text = LEADING_MARKER.sub("", text)
+    # any remaining symbol characters anywhere in the text
+    text = re.sub("[" + re.escape(SYMBOLS) + "]", "", text)
+    # every English word and every digit
     text = re.sub(r"[A-Za-z]+(?:[\-'][A-Za-z]+)*", "", text)
-    text = re.sub(r"[0-9]+(?:[\.,%][0-9]+)?%?", "", text)
-    # remove brackets left empty and tidy spacing/punctuation
+    text = re.sub(r"[0-9\u06F0-\u06F9\u0660-\u0669]+(?:[\.,%][0-9]+)?%?", "", text)
+    # brackets left empty, then tidy spacing and punctuation
     text = re.sub(r"[\(\[]\s*[\)\]]", "", text)
     text = re.sub(r"[ \t]+([،۔:؟!])", r"\1", text)
     text = re.sub(r"[ \t]{2,}", " ", text)
+    text = re.sub(r"\n[ \t]+", "\n", text)
     text = re.sub(r"\n{3,}", "\n\n", text).strip()
     return text or original
 
@@ -121,7 +134,9 @@ def call_qwen(message: str, language: str, history: Optional[list] = None) -> st
         timeout=REQUEST_TIMEOUT,
         max_retries=0,
     )
-    system_prompt = SYSTEM_PROMPT_UR if language == "ur" else SYSTEM_PROMPT_EN
+    # Use the Urdu prompt when the site says Urdu OR the farmer typed in Urdu script
+    use_urdu = language == "ur" or is_urdu_text(message)
+    system_prompt = SYSTEM_PROMPT_UR if use_urdu else SYSTEM_PROMPT_EN
 
     messages = [{"role": "system", "content": system_prompt}]
     messages.extend(history or [])
@@ -141,7 +156,7 @@ def call_qwen(message: str, language: str, history: Optional[list] = None) -> st
             if model != DASHSCOPE_MODEL:
                 print(f"[CHAT] answered by fallback model {model}")
             reply = reply.strip()
-            if language == "ur":
+            if use_urdu or is_urdu_text(reply):
                 reply = clean_urdu_reply(reply)
             return reply
         except Exception as e:
@@ -197,7 +212,7 @@ def chat(
     except Exception as e:
         debug_error = f"{type(e).__name__}: {e}"
         print(f"[CHAT FALLBACK] Qwen call failed ({debug_error}). Check DASHSCOPE_API_KEY / DASHSCOPE_BASE_URL / DASHSCOPE_MODEL")
-        reply = FALLBACK_REPLY_UR if language == "ur" else FALLBACK_REPLY_EN
+        reply = FALLBACK_REPLY_UR if (language == "ur" or is_urdu_text(message)) else FALLBACK_REPLY_EN
 
     created_at = datetime.now(timezone.utc).isoformat()
 
