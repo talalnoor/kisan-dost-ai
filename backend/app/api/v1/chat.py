@@ -6,17 +6,26 @@ from pydantic import BaseModel
 from typing import Optional
 from openai import OpenAI
 from supabase import create_client, Client
+from dotenv import load_dotenv
 from app.core.security import get_current_user, get_user_id
+
+load_dotenv()
 
 router = APIRouter(prefix="/api/v1/chat", tags=["chat"])
 
 supabase_url = os.environ.get("SUPABASE_URL")
 supabase_anon_key = os.environ.get("SUPABASE_ANON_KEY")
 
-DASHSCOPE_API_KEY = os.environ.get("DASHSCOPE_API_KEY")
-DASHSCOPE_BASE_URL = os.environ.get(
-    "DASHSCOPE_BASE_URL", "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
-)
+# .strip() guards against stray spaces/quotes copied into .env or Railway variables
+DASHSCOPE_API_KEY = (os.environ.get("DASHSCOPE_API_KEY") or "").strip().strip("\"'").strip()
+DASHSCOPE_BASE_URL = (
+    os.environ.get("DASHSCOPE_BASE_URL") or "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+).strip().strip("\"'").strip().rstrip("/")
+DASHSCOPE_MODEL = (os.environ.get("DASHSCOPE_MODEL") or "qwen-plus").strip()
+
+# In development the real error is returned in the response ("debug") to make fixing setup easy.
+IS_DEV = (os.environ.get("ENVIRONMENT") or "").strip().lower() == "development"
+MAX_HISTORY = 10  # previous messages sent to the model so it remembers the conversation
 
 SYSTEM_PROMPT_EN = (
     "You are Kisan Dost AI, a knowledgeable and friendly farming assistant for farmers in Pakistan. "
@@ -50,18 +59,40 @@ def get_user_supabase_client(token: str) -> Client:
     return client
 
 
-def call_qwen(message: str, language: str) -> str:
-    client = OpenAI(api_key=DASHSCOPE_API_KEY, base_url=DASHSCOPE_BASE_URL)
+def get_history(client: Client, session_id: str) -> list:
+    """Last few messages of this conversation, oldest first. Never raises."""
+    try:
+        result = (
+            client.table("chat_messages")
+            .select("role, content")
+            .eq("session_id", session_id)
+            .order("created_at", desc=True)
+            .limit(MAX_HISTORY)
+            .execute()
+        )
+        rows = list(reversed(result.data or []))
+        return [{"role": r["role"], "content": r["content"]} for r in rows if r.get("content")]
+    except Exception as e:
+        print(f"[CHAT] could not load history: {e}")
+        return []
+
+
+def call_qwen(message: str, language: str, history: Optional[list] = None) -> str:
+    if not DASHSCOPE_API_KEY:
+        raise RuntimeError("DASHSCOPE_API_KEY is empty or not set")
+
+    client = OpenAI(api_key=DASHSCOPE_API_KEY, base_url=DASHSCOPE_BASE_URL, timeout=30, max_retries=1)
     system_prompt = SYSTEM_PROMPT_UR if language == "ur" else SYSTEM_PROMPT_EN
 
-    response = client.chat.completions.create(
-        model="qwen-plus",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": message},
-        ],
-    )
-    return response.choices[0].message.content
+    messages = [{"role": "system", "content": system_prompt}]
+    messages.extend(history or [])
+    messages.append({"role": "user", "content": message})
+
+    response = client.chat.completions.create(model=DASHSCOPE_MODEL, messages=messages)
+    reply = response.choices[0].message.content
+    if not reply or not reply.strip():
+        raise RuntimeError("Qwen returned an empty reply")
+    return reply.strip()
 
 
 FALLBACK_REPLY_EN = (
@@ -79,49 +110,58 @@ def chat(
     user: dict = Depends(get_current_user),
     authorization: str = Header(None),
 ):
+    message = payload.message.strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+
+    language = payload.language if payload.language in ("en", "ur") else "en"
+
     user_id = get_user_id(user)
     token = authorization.replace("Bearer ", "") if authorization else None
     client = get_user_supabase_client(token)
 
     session_id = payload.session_id
-    if not session_id:
-        session_result = client.table("chat_sessions").insert({
-            "user_id": user_id,
-            "crop_id": payload.crop_id,
-        }).execute()
-        session_id = session_result.data[0]["id"]
+    history = []
+    if session_id:
+        history = get_history(client, session_id)
+    else:
+        try:
+            session_result = client.table("chat_sessions").insert({
+                "user_id": user_id,
+                "crop_id": payload.crop_id or None,
+            }).execute()
+            session_id = session_result.data[0]["id"]
+        except Exception as e:
+            print(f"[CHAT] could not create chat session: {e}")
+            raise HTTPException(status_code=500, detail=f"Could not start chat session: {e}")
 
+    debug_error = None
     try:
-        reply = call_qwen(payload.message, payload.language)
+        reply = call_qwen(message, language, history)
     except Exception as e:
-        print(f"[CHAT FALLBACK] Qwen call failed (check DASHSCOPE_API_KEY / DASHSCOPE_BASE_URL): {e}")
-        reply = FALLBACK_REPLY_UR if payload.language == "ur" else FALLBACK_REPLY_EN
+        debug_error = f"{type(e).__name__}: {e}"
+        print(f"[CHAT FALLBACK] Qwen call failed ({debug_error}). Check DASHSCOPE_API_KEY / DASHSCOPE_BASE_URL / DASHSCOPE_MODEL")
+        reply = FALLBACK_REPLY_UR if language == "ur" else FALLBACK_REPLY_EN
 
     created_at = datetime.now(timezone.utc).isoformat()
 
-    try:
-        client.table("chat_messages").insert({
-            "session_id": session_id,
-            "role": "user",
-            "content": payload.message,
-            "language": payload.language,
-        }).execute()
-        client.table("chat_messages").insert({
-            "session_id": session_id,
-            "role": "assistant",
-            "content": reply,
-            "language": payload.language,
-        }).execute()
-    except Exception as e:
-        print(f"[CHAT] could not save chat history: {e}")
+    # Only save real answers, so a fallback message never pollutes the conversation history
+    if debug_error is None:
+        try:
+            client.table("chat_messages").insert([
+                {"session_id": session_id, "role": "user", "content": message, "language": language},
+                {"session_id": session_id, "role": "assistant", "content": reply, "language": language},
+            ]).execute()
+        except Exception as e:
+            print(f"[CHAT] could not save chat history: {e}")
 
-    return {
-        "success": True,
-        "data": {
-            "session_id": session_id,
-            "reply": reply,
-            "language": payload.language,
-            "created_at": created_at,
-        },
-        "error": None,
+    data = {
+        "session_id": session_id,
+        "reply": reply,
+        "language": language,
+        "created_at": created_at,
     }
+    if debug_error and IS_DEV:
+        data["debug"] = debug_error
+
+    return {"success": True, "data": data, "error": None}
