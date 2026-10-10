@@ -1,4 +1,5 @@
 import os
+import re
 import uuid
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Header
@@ -46,15 +47,15 @@ SYSTEM_PROMPT_EN = (
 )
 
 SYSTEM_PROMPT_UR = (
-    "آپ کسان دوست AI ہیں، پاکستان کے کسانوں کے لیے ایک باخبر اور دوستانہ زرعی معاون۔ "
+    "آپ کسان دوست ہیں، پاکستان کے کسانوں کے لیے ایک باخبر اور دوستانہ زرعی معاون۔ "
     "فصلوں، بیماریوں، کھادوں، آبپاشی، مٹی اور موسم سے متعلق فیصلوں کے بارے میں عملی جواب دیں۔ "
     "مختصر اور واضح رہیں، اور غیر یقینی صورت میں اندازہ لگانے کی بجائے ایمانداری سے بتائیں۔ "
-    "سخت اصول: کبھی بھی کھاد یا کیمیکل کی مخصوص مقدار، فیصد یا وزن نہ بتائیں "
-    "(مثلاً '20-40 کلو فی ایکڑ' یا '0.5%' نہ کہیں)۔ "
+    "سخت اصول: کبھی بھی کھاد یا کیمیکل کی مخصوص مقدار، فیصد یا وزن نہ بتائیں۔ "
     "اس کی بجائے عمومی طریقہ بتائیں اور ہمیشہ کسان کو مقامی زرعی محکمے یا پروڈکٹ لیبل سے صحیح مقدار معلوم کرنے کا مشورہ دیں۔ "
-    "زبان کا اصول: صرف اردو (عربی رسم الخط) میں لکھیں۔ ہندی، گرمکھی، تامل یا کسی اور رسم الخط کے حروف ہرگز استعمال نہ کریں۔ "
-    "اگر کسی اردو لفظ کے بارے میں یقین نہ ہو تو آسان اور عام فہم لفظ استعمال کریں۔ "
-    "انگریزی اصطلاح صرف ضرورت پڑنے پر قوسین میں لکھیں۔"
+    "زبان کا اصول: صرف اردو (عربی رسم الخط) میں لکھیں۔ کوئی بھی انگریزی لفظ، قوسین میں انگریزی نام، یا ہندی، گرمکھی، تامل کے حروف ہرگز استعمال نہ کریں۔ "
+    "ہر چیز کے لیے آسان اردو لفظ استعمال کریں، مثلاً پھپھوندی، پھپھوندی کش دوا، جھلساؤ، کھاد۔ "
+    "فارمیٹ کا اصول: نمبر والی فہرست، ستارے، ہیش یا بلٹ نہ بنائیں۔ جواب کو چھوٹے سادہ جملوں اور چھوٹے پیراگرافوں میں لکھیں، "
+    "اور ترتیب بتانے کے لیے لفظ جیسے سب سے پہلے، اس کے بعد، پھر، آخر میں استعمال کریں۔"
 )
 
 
@@ -89,6 +90,22 @@ def get_history(client: Client, session_id: str) -> list:
         return []
 
 
+def clean_urdu_reply(text: str) -> str:
+    """Makes an Urdu answer safe for the speaker: no bracketed English, list numbers or markdown marks."""
+    original = text
+    # remove anything in brackets that contains English letters, e.g. (Fungicide)
+    text = re.sub(r"\s*[\(\[][^\)\]]*[A-Za-z][^\)\]]*[\)\]]", "", text)
+    # remove list numbers like "1." or "2)" at the start of a line
+    text = re.sub(r"(?m)^\s*\d+\s*[\.\)\-:]\s*", "", text)
+    # remove bullets and markdown marks
+    text = re.sub(r"(?m)^\s*[\*\-•]\s+", "", text)
+    text = text.replace("**", "").replace("*", "").replace("#", "")
+    # tidy spaces and blank lines
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()
+    return text or original
+
+
 def call_qwen(message: str, language: str, history: Optional[list] = None) -> str:
     """Tries the main model first, then the fallback model if the main one fails."""
     if not DASHSCOPE_API_KEY:
@@ -119,7 +136,10 @@ def call_qwen(message: str, language: str, history: Optional[list] = None) -> st
                 raise RuntimeError(f"{model} returned an empty reply")
             if model != DASHSCOPE_MODEL:
                 print(f"[CHAT] answered by fallback model {model}")
-            return reply.strip()
+            reply = reply.strip()
+            if language == "ur":
+                reply = clean_urdu_reply(reply)
+            return reply
         except Exception as e:
             last_error = e
             print(f"[CHAT] model {model} failed: {type(e).__name__}: {e}")
