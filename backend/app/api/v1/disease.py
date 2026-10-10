@@ -76,6 +76,35 @@ def get_prediction(image_bytes: bytes) -> dict:
         return mock_cv_predict(image_bytes)
 
 
+import re as _re
+
+_SKIP_WORDS = {"with", "and", "the", "of", "in", "on"}
+
+
+def _label_tokens(label):
+    parts = _re.split(r"[^a-z0-9]+", str(label).lower())
+    return {p for p in parts if p and p not in _SKIP_WORDS}
+
+
+def find_knowledge(table, label, default=None):
+    """Finds the knowledge entry for a model label even when the naming differs a little,
+    for example tomato_with_septoria_leaf_spot vs tomato_septoria_leaf_spot."""
+    if label in table:
+        return table[label]
+    wanted = _label_tokens(label)
+    best_key, best_score = None, 0.0
+    for key in table:
+        tokens = _label_tokens(key)
+        if not tokens or not wanted:
+            continue
+        score = len(tokens & wanted) / len(tokens | wanted)
+        if score > best_score:
+            best_key, best_score = key, score
+    if best_key is not None and best_score >= 0.7:
+        return table[best_key]
+    return default
+
+
 # Knowledge base covering all 38 PlantVillage classes the CV model
 # was trained on. Labels here must match the output of normalize_label()
 # in app/providers/cv/hf_plant_model.py exactly.
@@ -421,7 +450,7 @@ async def analyze_disease(
     low_confidence = confidence < 0.5
 
     if scan_type == "pest":
-        knowledge = PEST_KNOWLEDGE.get(disease_label, {
+        knowledge = find_knowledge(PEST_KNOWLEDGE, disease_label, {
             "display_name": disease_label.replace("_", " ").title(),
             "severity": "unknown",
             "symptoms": [],
@@ -439,7 +468,7 @@ async def analyze_disease(
             "prevention": ["Please upload a clear photo of a single leaf, filling most of the frame"],
         }
     else:
-        knowledge = MOCK_KNOWLEDGE.get(disease_label, {
+        knowledge = find_knowledge(MOCK_KNOWLEDGE, disease_label, {
             "display_name": disease_label,
             "severity": "unknown",
             "symptoms": [],
