@@ -16,12 +16,20 @@ router = APIRouter(prefix="/api/v1/chat", tags=["chat"])
 supabase_url = os.environ.get("SUPABASE_URL")
 supabase_anon_key = os.environ.get("SUPABASE_ANON_KEY")
 
-# .strip() guards against stray spaces/quotes copied into .env or Railway variables
-DASHSCOPE_API_KEY = (os.environ.get("DASHSCOPE_API_KEY") or "").strip().strip("\"'").strip()
-DASHSCOPE_BASE_URL = (
+
+def _clean(value: str) -> str:
+    # guards against stray spaces/quotes copied into .env or Railway variables
+    return (value or "").strip().strip("\"'").strip()
+
+
+DASHSCOPE_API_KEY = _clean(os.environ.get("DASHSCOPE_API_KEY"))
+DASHSCOPE_BASE_URL = _clean(
     os.environ.get("DASHSCOPE_BASE_URL") or "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
-).strip().strip("\"'").strip().rstrip("/")
-DASHSCOPE_MODEL = (os.environ.get("DASHSCOPE_MODEL") or "qwen-plus").strip()
+).rstrip("/")
+DASHSCOPE_MODEL = _clean(os.environ.get("DASHSCOPE_MODEL")) or "qwen-plus"
+# Used only when the main model is overloaded or times out
+DASHSCOPE_FALLBACK_MODEL = _clean(os.environ.get("DASHSCOPE_FALLBACK_MODEL")) or "gemini-3.5-flash-lite"
+REQUEST_TIMEOUT = 40  # seconds per model attempt
 
 # In development the real error is returned in the response ("debug") to make fixing setup easy.
 IS_DEV = (os.environ.get("ENVIRONMENT") or "").strip().lower() == "development"
@@ -41,8 +49,12 @@ SYSTEM_PROMPT_UR = (
     "آپ کسان دوست AI ہیں، پاکستان کے کسانوں کے لیے ایک باخبر اور دوستانہ زرعی معاون۔ "
     "فصلوں، بیماریوں، کھادوں، آبپاشی، مٹی اور موسم سے متعلق فیصلوں کے بارے میں عملی جواب دیں۔ "
     "مختصر اور واضح رہیں، اور غیر یقینی صورت میں اندازہ لگانے کی بجائے ایمانداری سے بتائیں۔ "
-    "سخت اصول: کبھی بھی کھاد یا کیمیکل کی مخصوص مقدار، فیصد یا وزن نہ بتائیں (مثلاً '20-40 کلو فی ایکڑ' یا '0.5%' نہ کہیں)۔ "
-    "اس کی بجائے عمومی طریقہ بتائیں اور ہمیشہ کسان کو مقامی زرعی محکمہ یا پروڈکٹ لیبل سے صحیح مقدار معلوم کرنے کا مشورہ دیں۔"
+    "سخت اصول: کبھی بھی کھاد یا کیمیکل کی مخصوص مقدار، فیصد یا وزن نہ بتائیں "
+    "(مثلاً '20-40 کلو فی ایکڑ' یا '0.5%' نہ کہیں)۔ "
+    "اس کی بجائے عمومی طریقہ بتائیں اور ہمیشہ کسان کو مقامی زرعی محکمے یا پروڈکٹ لیبل سے صحیح مقدار معلوم کرنے کا مشورہ دیں۔ "
+    "زبان کا اصول: صرف اردو (عربی رسم الخط) میں لکھیں۔ ہندی، گرمکھی، تامل یا کسی اور رسم الخط کے حروف ہرگز استعمال نہ کریں۔ "
+    "اگر کسی اردو لفظ کے بارے میں یقین نہ ہو تو آسان اور عام فہم لفظ استعمال کریں۔ "
+    "انگریزی اصطلاح صرف ضرورت پڑنے پر قوسین میں لکھیں۔"
 )
 
 
@@ -78,21 +90,41 @@ def get_history(client: Client, session_id: str) -> list:
 
 
 def call_qwen(message: str, language: str, history: Optional[list] = None) -> str:
+    """Tries the main model first, then the fallback model if the main one fails."""
     if not DASHSCOPE_API_KEY:
         raise RuntimeError("DASHSCOPE_API_KEY is empty or not set")
 
-    client = OpenAI(api_key=DASHSCOPE_API_KEY, base_url=DASHSCOPE_BASE_URL, timeout=30, max_retries=1)
+    client = OpenAI(
+        api_key=DASHSCOPE_API_KEY,
+        base_url=DASHSCOPE_BASE_URL,
+        timeout=REQUEST_TIMEOUT,
+        max_retries=0,
+    )
     system_prompt = SYSTEM_PROMPT_UR if language == "ur" else SYSTEM_PROMPT_EN
 
     messages = [{"role": "system", "content": system_prompt}]
     messages.extend(history or [])
     messages.append({"role": "user", "content": message})
 
-    response = client.chat.completions.create(model=DASHSCOPE_MODEL, messages=messages)
-    reply = response.choices[0].message.content
-    if not reply or not reply.strip():
-        raise RuntimeError("Qwen returned an empty reply")
-    return reply.strip()
+    models = [DASHSCOPE_MODEL]
+    if DASHSCOPE_FALLBACK_MODEL and DASHSCOPE_FALLBACK_MODEL != DASHSCOPE_MODEL:
+        models.append(DASHSCOPE_FALLBACK_MODEL)
+
+    last_error = None
+    for model in models:
+        try:
+            response = client.chat.completions.create(model=model, messages=messages)
+            reply = response.choices[0].message.content
+            if not reply or not reply.strip():
+                raise RuntimeError(f"{model} returned an empty reply")
+            if model != DASHSCOPE_MODEL:
+                print(f"[CHAT] answered by fallback model {model}")
+            return reply.strip()
+        except Exception as e:
+            last_error = e
+            print(f"[CHAT] model {model} failed: {type(e).__name__}: {e}")
+
+    raise last_error
 
 
 FALLBACK_REPLY_EN = (
